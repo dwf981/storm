@@ -38,8 +38,6 @@ def main(args):
         'api_provider': os.getenv('OPENAI_API_TYPE'),
         'temperature': 1.0,
         'top_p': 0.9,
-        'api_base': os.getenv('AZURE_API_BASE'),
-        'api_version': os.getenv('AZURE_API_VERSION'),
     }
 
     # STORM is a LM system so different components can be powered by different models.
