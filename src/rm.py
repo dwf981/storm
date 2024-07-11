@@ -408,110 +408,92 @@ class VectorRM(dspy.Retrieve):
 
 
 class DuckDuckGoSearch(dspy.Retrieve):
-    """Retrieves information from DuckDuckGo.
-
-    This class leverages both the DuckDuckGo Instant Answers API for direct answers and web scraping for a broader range of results.
-    """
-
     def __init__(self, k=3, is_valid_source: Callable = None):
-        """Initializes the DuckDuckGoSearch retriever.
-
-        Args:
-            k (int): The number of top results to retrieve.
-            is_valid_source (Callable, optional): A function to validate the source of a URL. Defaults to None, accepting all URLs.
-        """
         super().__init__(k=k)
-        self.webpage_helper = WebPageHelper()
         self.usage = 0
-        self.is_valid_source = is_valid_source if is_valid_source else lambda x: True
+        self.instant_answer_url = "https://api.duckduckgo.com/"
+        self.search_url = "https://duckduckgo.com/html/"
+        
+        # If not None, is_valid_source shall be a function that takes a URL and returns a boolean.
+        if is_valid_source:
+            self.is_valid_source = is_valid_source
+        else:
+            self.is_valid_source = lambda x: True
 
-    def get_usage_and_reset(self):
-        """Tracks and resets the usage of the retriever."""
-        usage = self.usage
-        self.usage = 0
-        return {'DuckDuckGoSearch': usage}
+    def _get_instant_answer(self, query: str) -> Union[str, None]:
+        try:
+            params = {
+                "q": query,
+                "format": "json",
+                "no_redirect": 1,
+                "no_html": 1,
+                "skip_disambig": 1
+            }
+            response = requests.get(self.instant_answer_url, params=params)
+            if response.status_code == 200:
+                data = response.json()
+                print(f"API Response: {data}")  # Debug print
+                answer = data.get("Abstract") or data.get("Answer") or data.get("Definition")
+                if answer:
+                    return answer
+                else:
+                    logging.warning(f"No useful information found in response for query: {query}")
+                    return None
+            else:
+                logging.error(f"Error fetching instant answer: {response.status_code} for query: {query}")
+                return None
+        except requests.RequestException as e:
+            logging.error(f"RequestException in _get_instant_answer: {e}")
+            return None
+        except ValueError as e:
+            logging.error(f"ValueError in _get_instant_answer: {e}")
+            return None
+        except Exception as e:
+            print(f"Error: {e}")  # Debug print
+            logging.error(f"Unexpected exception in _get_instant_answer: {e}")
+            return None
+
+    def _get_search_results(self, query: str, exclude_urls: List[str]) -> List[dict]:
+        try:
+            params = {
+                "q": query
+            }
+            response = requests.get(self.search_url, params=params)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, "html.parser")
+                results = []
+                for a in soup.find_all("a", class_="result__a"):
+                    url = a["href"]
+                    if self.is_valid_source(url) and url not in exclude_urls:
+                        results.append({
+                            "title": a.get_text(),
+                            "url": url
+                        })
+                return results
+            else:
+                logging.error(f"Error fetching search results: {response.status_code}")
+                return []
+        except Exception as e:
+            logging.error(f"Exception in _get_search_results: {e}")
+            return []
 
     def forward(self, query_or_queries: Union[str, List[str]], exclude_urls: List[str] = []):
-        """Retrieves information from DuckDuckGo based on the given query or queries.
-
-        Args:
-            query_or_queries (Union[str, List[str]]): The query or list of queries to search for.
-            exclude_urls (List[str], optional): URLs to exclude from the results. Defaults to an empty list.
-
-        Returns:
-            List[Dict]: A list of dictionaries, each containing information about a retrieved result.
-                         The dictionary has keys 'description', 'snippets' (list of strings), 'title', and 'url'.
-        """
-        queries = [query_or_queries] if isinstance(query_or_queries, str) else query_or_queries
+        queries = (
+            [query_or_queries]
+            if isinstance(query_or_queries, str)
+            else query_or_queries
+        )
         self.usage += len(queries)
         collected_results = []
-
         for query in queries:
-            # 1. Try Instant Answers API for direct answers
             instant_answer = self._get_instant_answer(query)
             if instant_answer:
                 collected_results.append({
-                    'description': instant_answer,
-                    'snippets': [instant_answer],
-                    'title': query,  # Use the query as the title for instant answers
-                    'url': f"https://api.duckduckgo.com/?q={query}&format=json"  # API URL as reference
+                    "title": "Instant Answer",
+                    "url": "",
+                    "description": instant_answer,
+                    "snippets": [instant_answer]
                 })
-                if len(collected_results) >= self.k:
-                    break  # Stop if we have enough results
-
-            # 2. If not enough results, use web scraping
-            if len(collected_results) < self.k:
-                search_results = self._get_search_results(query, exclude_urls)
-                valid_results = self.webpage_helper.urls_to_snippets(
-                    [r['url'] for r in search_results if self.is_valid_source(r['url'])]
-                )
-                for url, result in valid_results.items():
-                    collected_results.append({
-                        'description': result.get('description', ''),
-                        'snippets': result['snippets'],
-                        'title': result.get('title', query),  # Use query as fallback title
-                        'url': url
-                    })
-                    if len(collected_results) >= self.k:
-                        break  # Stop if we have enough results
-
+            search_results = self._get_search_results(query, exclude_urls)
+            collected_results.extend(search_results[:self.k])
         return collected_results
-
-    def _get_instant_answer(self, query):
-        """Fetches an instant answer from the DuckDuckGo API, with polling for 202 responses."""
-        url = f"https://api.duckduckgo.com/?q={query}&format=json"
-        max_attempts = 5  # Maximum number of polling attempts
-        attempt = 0
-
-        while attempt < max_attempts:
-            response = requests.get(url)
-
-            if response.status_code == 200:
-                data = response.json()
-                if data["Abstract"]:
-                    return data["Abstract"]
-                elif "RelatedTopics" in data and data["RelatedTopics"]:
-                    return data["RelatedTopics"][0]["Text"]
-            elif response.status_code != 202:
-                print(f"Error: Unexpected status code {response.status_code} from DuckDuckGo API")
-                return None
-
-            attempt += 1
-            time.sleep(2)  # Wait for 2 seconds before retrying
-
-        print("Error: Maximum polling attempts reached. No answer found.")
-        return None
-
-    def _get_search_results(self, query, exclude_urls):
-        """Fetches search results from DuckDuckGo using web scraping."""
-        url = f"https://duckduckgo.com/html/?q={query}"
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        results = []
-        for result in soup.find_all('a', class_='result__a'):
-            title = result.text
-            link = result['href']
-            if link not in exclude_urls:  # Filter out excluded URLs
-                results.append({'title': title, 'url': link})
-        return results
