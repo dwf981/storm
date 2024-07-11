@@ -22,7 +22,7 @@
     AddMenu( "ProjectMenu", "&README.md...`tR", "OnReadme", BrowserPath )
     AddMenu( "ProjectMenu" )
     AddMenu( "ProjectMenu", "&Sync with Upstream`tS", "OnSyncWithUpstream", ConEmuPath )
-    AddMenu( "ProjectMenu", "&STORM...`tS", "OnStormWsl", ResDir "github.ico" )
+    AddMenu( "ProjectMenu", "&STORM...`tS", "OnStorm", ResDir "github.ico" )
     AddMenu( "ProjectMenu", "Open &Secrets File`tS", "OnOpenSecretsFile", VSCodePath )
     AddMenu( "ProjectMenu" )
     AddMenuItemEditProjectMenu("ProjectMenu")
@@ -57,17 +57,12 @@ OnStorm:
             echo.
             call e remove
             call e
-            echo Installing Streamlit
-            call conda install -c conda-forge streamlit
-            echo Installing Python packages from requirements.txt
-            pip install -r requirements.txt
-            pip install "pydantic>=1.0,<2.0"
             popd
         `)
 
         pushd "!ProjectDir!" || goto :exit
         call e
-        python examples\run_storm_wiki_gpt.py
+        python examples\run_storm_wiki_gpt.py --output-dir . --retriever duckduckgo --do-research --do-generate-outline --do-generate-article --do-polish-article
         popd
     )
         
