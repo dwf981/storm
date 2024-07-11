@@ -23,7 +23,7 @@
     AddMenu( "ProjectMenu" )
     AddMenu( "ProjectMenu", "&Sync with Upstream`tS", "OnSyncWithUpstream", ConEmuPath )
     AddMenu( "ProjectMenu", "&STORM...`tS", "OnStormWsl", ResDir "github.ico" )
-    AddMenu( "ProjectMenu", "Open &Config Local`tL", "OnOpenConfigLocal", VSCodePath )
+    AddMenu( "ProjectMenu", "Open &Secrets File`tS", "OnOpenSecretsFile", VSCodePath )
     AddMenu( "ProjectMenu" )
     AddMenuItemEditProjectMenu("ProjectMenu")
     ShowMenu( "ProjectMenu" )
@@ -35,7 +35,7 @@ MenuHandler:
 return
 
 OnSyncWithUpstream:
-    SyncWithUpstream(ProjectDir, "https://github.com/jgravelle/AutoGroq.git")
+    SyncWithUpstream(ProjectDir, "https://github.com/stanford-oval/storm.git")
 return
 
 OnStorm:
@@ -124,7 +124,7 @@ OnStormWsl:
     return
 }
 
-OnOpenConfigLocal:
+OnOpenSecretsFile:
 {
     SplitPath, A_LineFile,, ProjectDir
     SplitPath, ProjectDir,, ProjectDir
