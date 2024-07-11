@@ -18,12 +18,13 @@
 
     ; Project Menu
     AddMenuItemEditor("ProjectMenu")
+    AddMenu( "ProjectMenu", "Open &PyCharm`tP", "OnOpenPyCharm", PyCharmPath )
     AddMenu( "ProjectMenu" )
     AddMenu( "ProjectMenu", "&README.md...`tR", "OnReadme", BrowserPath )
     AddMenu( "ProjectMenu" )
     AddMenu( "ProjectMenu", "&Sync with Upstream`tS", "OnSyncWithUpstream", ConEmuPath )
-    AddMenu( "ProjectMenu", "&STORM...`tS", "OnStorm", ResDir "github.ico" )
-    AddMenu( "ProjectMenu", "Open &Secrets File`tS", "OnOpenSecretsFile", VSCodePath )
+    AddMenu( "ProjectMenu", "S&TORM...`tT", "OnStorm", ResDir "github.ico" )
+    AddMenu( "ProjectMenu", "&Open Secrets File`tO", "OnOpenSecretsFile", VSCodePath )
     AddMenu( "ProjectMenu" )
     AddMenuItemEditProjectMenu("ProjectMenu")
     ShowMenu( "ProjectMenu" )

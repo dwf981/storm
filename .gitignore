@@ -7,7 +7,6 @@ __pycache__/
 .DS_Store
 
 # Other
-.vscode
 *.tsv
 *.pt
 gpt*.txt
@@ -23,3 +22,4 @@ secrets.toml
 *.log
 */assertion.log
 *results/
+out/
