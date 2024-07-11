@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from typing import Callable, Union, List
 
 import dspy
@@ -477,15 +478,28 @@ class DuckDuckGoSearch(dspy.Retrieve):
         return collected_results
 
     def _get_instant_answer(self, query):
-        """Fetches an instant answer from the DuckDuckGo API."""
+        """Fetches an instant answer from the DuckDuckGo API, with polling for 202 responses."""
         url = f"https://api.duckduckgo.com/?q={query}&format=json"
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            if data["Abstract"]:
-                return data["Abstract"]
-            elif data["RelatedTopics"]:
-                return data["RelatedTopics"][0]["Text"]
+        max_attempts = 5  # Maximum number of polling attempts
+        attempt = 0
+
+        while attempt < max_attempts:
+            response = requests.get(url)
+
+            if response.status_code == 200:
+                data = response.json()
+                if data["Abstract"]:
+                    return data["Abstract"]
+                elif "RelatedTopics" in data and data["RelatedTopics"]:
+                    return data["RelatedTopics"][0]["Text"]
+            elif response.status_code != 202:
+                print(f"Error: Unexpected status code {response.status_code} from DuckDuckGo API")
+                return None
+
+            attempt += 1
+            time.sleep(2)  # Wait for 2 seconds before retrying
+
+        print("Error: Maximum polling attempts reached. No answer found.")
         return None
 
     def _get_search_results(self, query, exclude_urls):

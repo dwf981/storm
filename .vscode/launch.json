@@ -16,9 +16,9 @@
             "name": "Python Test Runner: test_rm.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/tests/test_rm.py",
+            "module": "unittest",
             "console": "integratedTerminal",
-            "args": [],
+            "args": ["discover", "tests"],
             "env": {
                     "PYTHONPATH": "${workspaceFolder}/src"
                 }
