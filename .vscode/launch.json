@@ -5,12 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Current File with Arguments",
+            "name": "Python Debugger: run_storm_wiki_gpt.py",
             "type": "debugpy",
             "request": "launch",
             "program": "examples/run_storm_wiki_gpt.py",
             "console": "integratedTerminal",
-            "args": "--output-dir out --retriever duckduckgo --do-research --do-generate-outline --do-generate-article --do-polish-article"
+            "args": "--output-dir out --retriever bing --do-research --do-generate-outline --do-generate-article --do-polish-article"
         },
         {
             "name": "Python Test Runner: test_rm.py",
