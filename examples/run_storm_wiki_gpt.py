@@ -20,14 +20,12 @@ args.output_dir/
 """
 
 import os
-import sys
 from argparse import ArgumentParser
 
-sys.path.append('./src')
-from lm import OpenAIModel
-from rm import YouRM, BingSearch, DuckDuckGoSearch
-from storm_wiki.engine import STORMWikiRunnerArguments, STORMWikiRunner, STORMWikiLMConfigs
-from utils import load_api_key
+from knowledge_storm import STORMWikiRunnerArguments, STORMWikiRunner, STORMWikiLMConfigs
+from knowledge_storm.lm import OpenAIModel, AzureOpenAIModel
+from knowledge_storm.rm import YouRM, BingSearch
+from knowledge_storm.utils import load_api_key
 
 
 def main(args):
@@ -35,21 +33,29 @@ def main(args):
     lm_configs = STORMWikiLMConfigs()
     openai_kwargs = {
         'api_key': os.getenv("OPENAI_API_KEY"),
-        'api_provider': os.getenv('OPENAI_API_TYPE'),
         'temperature': 1.0,
         'top_p': 0.9,
     }
+
+    ModelClass = OpenAIModel if os.getenv('OPENAI_API_TYPE') == 'openai' else AzureOpenAIModel
+    # If you are using Azure service, make sure the model name matches your own deployed model name.
+    # The default name here is only used for demonstration and may not match your case.
+    gpt_35_model_name = 'gpt-3.5-turbo' if os.getenv('OPENAI_API_TYPE') == 'openai' else 'gpt-35-turbo'
+    gpt_4_model_name = 'gpt-4o'
+    if os.getenv('OPENAI_API_TYPE') == 'azure':
+        openai_kwargs['api_base'] = os.getenv('AZURE_API_BASE')
+        openai_kwargs['api_version'] = os.getenv('AZURE_API_VERSION')
 
     # STORM is a LM system so different components can be powered by different models.
     # For a good balance between cost and quality, you can choose a cheaper/faster model for conv_simulator_lm
     # which is used to split queries, synthesize answers in the conversation. We recommend using stronger models
     # for outline_gen_lm which is responsible for organizing the collected information, and article_gen_lm
     # which is responsible for generating sections with citations.
-    conv_simulator_lm = OpenAIModel(model='gpt-3.5-turbo', max_tokens=500, **openai_kwargs)
-    question_asker_lm = OpenAIModel(model='gpt-3.5-turbo', max_tokens=500, **openai_kwargs)
-    outline_gen_lm = OpenAIModel(model='gpt-4-0125-preview', max_tokens=400, **openai_kwargs)
-    article_gen_lm = OpenAIModel(model='gpt-4-0125-preview', max_tokens=700, **openai_kwargs)
-    article_polish_lm = OpenAIModel(model='gpt-4-0125-preview', max_tokens=4000, **openai_kwargs)
+    conv_simulator_lm = ModelClass(model=gpt_35_model_name, max_tokens=500, **openai_kwargs)
+    question_asker_lm = ModelClass(model=gpt_35_model_name, max_tokens=500, **openai_kwargs)
+    outline_gen_lm = ModelClass(model=gpt_4_model_name, max_tokens=400, **openai_kwargs)
+    article_gen_lm = ModelClass(model=gpt_4_model_name, max_tokens=700, **openai_kwargs)
+    article_polish_lm = ModelClass(model=gpt_4_model_name, max_tokens=4000, **openai_kwargs)
 
     lm_configs.set_conv_simulator_lm(conv_simulator_lm)
     lm_configs.set_question_asker_lm(question_asker_lm)
@@ -67,13 +73,10 @@ def main(args):
 
     # STORM is a knowledge curation system which consumes information from the retrieval module.
     # Currently, the information source is the Internet and we use search engine API as the retrieval module.
-    rm = None
     if args.retriever == 'bing':
         rm = BingSearch(bing_search_api=os.getenv('BING_SEARCH_API_KEY'), k=engine_args.search_top_k)
     elif args.retriever == 'you':
         rm = YouRM(ydc_api_key=os.getenv('YDC_API_KEY'), k=engine_args.search_top_k)
-    elif args.retriever == 'duckduckgo':
-        rm = DuckDuckGoSearch(k=engine_args.search_top_k)
 
     runner = STORMWikiRunner(engine_args, lm_configs, rm)
 
@@ -98,7 +101,7 @@ if __name__ == '__main__':
                         help='Maximum number of threads to use. The information seeking part and the article generation'
                              'part can speed up by using multiple threads. Consider reducing it if keep getting '
                              '"Exceed rate limit" error when calling LM API.')
-    parser.add_argument('--retriever', type=str, choices=['bing', 'you', 'duckduckgo'],
+    parser.add_argument('--retriever', type=str, choices=['bing', 'you'],
                         help='The search engine API to use for retrieving information.')
     # stage of the pipeline
     parser.add_argument('--do-research', action='store_true',

@@ -1,19 +1,18 @@
 import logging
 import os
-import time
 from typing import Callable, Union, List
 
 import dspy
 import pandas as pd
 import requests
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import Qdrant
 from qdrant_client import QdrantClient, models
 from tqdm import tqdm
 
-from utils import WebPageHelper
-from bs4 import BeautifulSoup
+from .utils import WebPageHelper
+
 
 class YouRM(dspy.Retrieve):
     def __init__(self, ydc_api_key=None, k=3, is_valid_source: Callable = None):
@@ -404,96 +403,4 @@ class VectorRM(dspy.Retrieve):
                     'url': doc.metadata['url'],
                 })
 
-        return collected_results
-
-
-class DuckDuckGoSearch(dspy.Retrieve):
-    def __init__(self, k=3, is_valid_source: Callable = None):
-        super().__init__(k=k)
-        self.usage = 0
-        self.instant_answer_url = "https://api.duckduckgo.com/"
-        self.search_url = "https://duckduckgo.com/html/"
-        
-        # If not None, is_valid_source shall be a function that takes a URL and returns a boolean.
-        if is_valid_source:
-            self.is_valid_source = is_valid_source
-        else:
-            self.is_valid_source = lambda x: True
-
-    def _get_instant_answer(self, query: str) -> Union[str, None]:
-        try:
-            params = {
-                "q": query,
-                "format": "json",
-                "no_redirect": 1,
-                "no_html": 1,
-                "skip_disambig": 1
-            }
-            response = requests.get(self.instant_answer_url, params=params)
-            if response.status_code == 200:
-                data = response.json()
-                print(f"API Response: {data}")  # Debug print
-                answer = data.get("Abstract") or data.get("Answer") or data.get("Definition")
-                if answer:
-                    return answer
-                else:
-                    logging.warning(f"No useful information found in response for query: {query}")
-                    return None
-            else:
-                logging.error(f"Error fetching instant answer: {response.status_code} for query: {query}")
-                return None
-        except requests.RequestException as e:
-            logging.error(f"RequestException in _get_instant_answer: {e}")
-            return None
-        except ValueError as e:
-            logging.error(f"ValueError in _get_instant_answer: {e}")
-            return None
-        except Exception as e:
-            print(f"Error: {e}")  # Debug print
-            logging.error(f"Unexpected exception in _get_instant_answer: {e}")
-            return None
-
-    def _get_search_results(self, query: str, exclude_urls: List[str]) -> List[dict]:
-        try:
-            params = {
-                "q": query
-            }
-            response = requests.get(self.search_url, params=params)
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, "html.parser")
-                results = []
-                for a in soup.find_all("a", class_="result__a"):
-                    url = a["href"]
-                    if self.is_valid_source(url) and url not in exclude_urls:
-                        results.append({
-                            "title": a.get_text(),
-                            "url": url
-                        })
-                return results
-            else:
-                logging.error(f"Error fetching search results: {response.status_code}")
-                return []
-        except Exception as e:
-            logging.error(f"Exception in _get_search_results: {e}")
-            return []
-
-    def forward(self, query_or_queries: Union[str, List[str]], exclude_urls: List[str] = []):
-        queries = (
-            [query_or_queries]
-            if isinstance(query_or_queries, str)
-            else query_or_queries
-        )
-        self.usage += len(queries)
-        collected_results = []
-        for query in queries:
-            instant_answer = self._get_instant_answer(query)
-            if instant_answer:
-                collected_results.append({
-                    "title": "Instant Answer",
-                    "url": "",
-                    "description": instant_answer,
-                    "snippets": [instant_answer]
-                })
-            search_results = self._get_search_results(query, exclude_urls)
-            collected_results.extend(search_results[:self.k])
         return collected_results

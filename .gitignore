@@ -16,6 +16,7 @@ local_*
 build/
 *.egg-info/
 .idea
+.venv
 
 # Project-specific
 secrets.toml
