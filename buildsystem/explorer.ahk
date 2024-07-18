@@ -24,6 +24,7 @@
     AddMenu( "ProjectMenu" )
     AddMenu( "ProjectMenu", "&Sync with Upstream`tS", "OnSyncWithUpstream", ConEmuPath )
     AddMenu( "ProjectMenu", "S&TORM...`tT", "OnStorm", ResDir "github.ico" )
+    AddMenu( "ProjectMenu", "STORM &UI...`tU", "OnStormUI", ResDir "github.ico" )
     AddMenu( "ProjectMenu", "&Open Secrets File`tO", "OnOpenSecretsFile", VSCodePath )
     AddMenu( "ProjectMenu" )
     AddMenuItemEditProjectMenu("ProjectMenu")
@@ -64,7 +65,40 @@ OnStorm:
         pushd "!ProjectDir!" || goto :exit
         call e
         set PYTHONPATH=!PYTHONPATH!;!ProjectDir!
-        python examples\run_storm_wiki_gpt.py --output-dir . --retriever duckduckgo --do-research --do-generate-outline --do-generate-article --do-polish-article
+        python examples\run_storm_wiki_gpt.py --output-dir . --retriever bing --do-research --do-generate-outline --do-generate-article --do-polish-article
+        popd
+    )
+        
+    RunBat({ Visible: "ConEmu", Colors: true, Pause: true }, StripBat( Script ) )
+    return
+}
+
+OnStormUI:
+{
+    SplitPath, A_LineFile,, ProjectDir
+    SplitPath, ProjectDir,, ProjectDir
+    ShiftPressed := GetKeyState("Shift","P")
+    Script =
+    (
+
+        set ProjectName=storm
+        set ProjectDir=%ProjectDir%
+        set should_install=%ShiftPressed%
+        call e exist param storm >nul 2>&1
+        if "!errorlevel!" equ "1" set should_install=1
+
+        if "!should_install!" equ "1" `(
+            pushd "!ProjectDir!" || goto :exit
+            echo.
+            call e remove
+            call e
+            popd
+        `)
+
+        pushd "!ProjectDir!" || goto :exit
+        call e
+        set PYTHONPATH=!PYTHONPATH!;!ProjectDir!
+        streamlit run frontend\demo_light\storm.py
         popd
     )
         
