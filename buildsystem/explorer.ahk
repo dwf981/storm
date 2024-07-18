@@ -63,6 +63,7 @@ OnStorm:
 
         pushd "!ProjectDir!" || goto :exit
         call e
+        set PYTHONPATH=!PYTHONPATH!;!ProjectDir!
         python examples\run_storm_wiki_gpt.py --output-dir . --retriever duckduckgo --do-research --do-generate-outline --do-generate-article --do-polish-article
         popd
     )
@@ -98,6 +99,7 @@ OnStormWsl:
             cd "%ProjectDirWsl%" || { echo "Failed to change directory."; exit 1; }
             source /home/ubuntu/anaconda3/etc/profile.d/conda.sh
             conda activate storm || { echo "Failed to activate environment."; exit 1; }
+            PYTHONPATH=$PYTHONPATH;%ProjectDirWsl%
             python examples/run_storm_wiki_gpt.py
         else
             source /home/ubuntu/anaconda3/etc/profile.d/conda.sh
