@@ -13,6 +13,14 @@
             "args": "--output-dir out --retriever bing --do-research --do-generate-outline --do-generate-article --do-polish-article"
         },
         {
+            "name": "Python Debugger: run_storm_wiki_gpt_with_VectorRM.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "examples/run_storm_wiki_gpt_with_VectorRM.py",
+            "console": "integratedTerminal",
+            "args": "--output-dir out --vector-db-mode online --do-research --do-generate-outline --do-generate-article --do-polish-article"
+        },
+        {
             "name": "Python Test Runner: test_rm.py",
             "type": "debugpy",
             "request": "launch",
