@@ -4,9 +4,6 @@
 
     AuxLibLoad( "default" )
 
-    Cli_Dispatch()
-
-    ; Project Menu
     AddMenuItemEditor("ProjectMenu")
     AddMenu( "ProjectMenu", "Open &PyCharm`tP", "OnOpenPyCharm", PyCharmPath )
     AddMenu( "ProjectMenu" )
