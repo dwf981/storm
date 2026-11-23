@@ -1,155 +1,58 @@
+#Requires AutoHotkey v2.0
 #SingleInstance Off
-#NoTrayIcon
-#Include <AuxLib>
+#Warn All, OutputDebug
 
-    AuxLibLoad( "default" )
+#Include <Explorer>
 
-    AddMenuItemEditor("ProjectMenu")
-    AddMenu( "ProjectMenu", "Open &PyCharm`tP", "OnOpenPyCharm", PyCharmPath )
-    AddMenu( "ProjectMenu" )
-    AddMenu( "ProjectMenu", "&README.md...`tR", "OnReadme", BrowserPath )
-    AddMenu( "ProjectMenu" )
-    AddMenu( "ProjectMenu", "&Sync with Upstream`tS", "OnSyncWithUpstream", ConEmuPath )
-    AddMenu( "ProjectMenu", "S&TORM...`tT", "OnStorm", ResDir "github.ico" )
-    AddMenu( "ProjectMenu", "STORM &UI...`tU", "OnStormUI", ResDir "github.ico" )
-    AddMenu( "ProjectMenu", "&Open Secrets File`tO", "OnOpenSecretsFile", VSCodePath )
-    AddMenu( "ProjectMenu" )
-    AddMenuItemEditProjectMenu("ProjectMenu")
-    ShowMenu( "ProjectMenu" )
-    ExitApp
-return ; end of script's auto-execute section
-
-MenuHandler:
-    MsgBox % "MenuHandler was called."
-return
-
-OnSyncWithUpstream:
-    SyncWithUpstream(ProjectDir, "https://github.com/stanford-oval/storm.git")
-return
-
-OnStorm:
-{
-    SplitPath, A_LineFile,, ProjectDir
-    SplitPath, ProjectDir,, ProjectDir
-    ShiftPressed := GetKeyState("Shift","P")
-    Script =
-    (
-
-        set ProjectName=storm
-        set ProjectDir=%ProjectDir%
-        set should_install=%ShiftPressed%
-        call e exist param storm >nul 2>&1
-        if "!errorlevel!" equ "1" set should_install=1
-
-        if "!should_install!" equ "1" `(
-            pushd "!ProjectDir!" || goto :exit
-            echo.
-            call e remove
-            call e
-            popd
-        `)
-
-        pushd "!ProjectDir!" || goto :exit
-        call e
-        set PYTHONPATH=!PYTHONPATH!;!ProjectDir!
-        python examples\run_storm_wiki_gpt.py --output-dir . --retriever bing --do-research --do-generate-outline --do-generate-article --do-polish-article
-        popd
-    )
-        
-    Run_Bat({ Visible: "ConEmu", Colors: true, Pause: true }, StripBat( Script ) )
-    return
+ProjectMenu() {
+    items := ProjectMenu_Editor(false)
+    items.Push({ text: "Open &PyCharm`tP", id: "OnOpenPyCharm", run: OnOpenPyCharm, icon: "@PyCharmPath" })
+    items.Push("-", ProjectMenu_Readme(), "-")
+    items.Push({ text: "&Sync with Upstream`tS", id: "OnSyncWithUpstream", run: OnSyncWithUpstream, icon: "@ConEmuPath" })
+    items.Push({ text: "S&TORM...`tT", id: "OnStorm", run: OnStorm, icon: "github.ico" })
+    items.Push({ text: "STORM &UI...`tU", id: "OnStormUI", run: OnStormUI, icon: "github.ico" })
+    items.Push({ text: "&Open Secrets File`tO", id: "OnOpenSecretsFile", run: OnOpenSecretsFile, icon: "@VSCodePath" })
+    items.Push("-")
+    items.Push(ProjectMenu_EditMenu()*)
+    return items
 }
 
-OnStormUI:
-{
-    SplitPath, A_LineFile,, ProjectDir
-    SplitPath, ProjectDir,, ProjectDir
-    ShiftPressed := GetKeyState("Shift","P")
-    Script =
-    (
+; This script lives in <repo>\buildsystem.
+ScriptRepo() => RegExReplace(A_ScriptDir, "\\[^\\]+$")
 
-        set ProjectName=storm
-        set ProjectDir=%ProjectDir%
-        set should_install=%ShiftPressed%
-        call e exist param storm >nul 2>&1
-        if "!errorlevel!" equ "1" set should_install=1
+OnSyncWithUpstream() => SyncWithUpstream(Explorer2_ProjectDir(), "https://github.com/stanford-oval/storm.git")
 
-        if "!should_install!" equ "1" `(
-            pushd "!ProjectDir!" || goto :exit
-            echo.
-            call e remove
-            call e
-            popd
-        `)
+; Runs a command of the storm checkout in its conda environment (created on first use, or again with Shift).
+StormRun(command) {
+    Run_Bat({ Visible: "ConEmu", Colors: true, Pause: true, Vars: { ProjectDir: ScriptRepo(), Reinstall: Cli_Shift() ? "1" : "0", StormCommand: command } }, "
+(
+set ProjectName=storm
+set should_install=!Reinstall!
+call e exist param storm >nul 2>&1
+if "!errorlevel!" equ "1" set should_install=1
 
-        pushd "!ProjectDir!" || goto :exit
-        call e
-        set PYTHONPATH=!PYTHONPATH!;!ProjectDir!
-        streamlit run frontend\demo_light\storm.py
-        popd
-    )
-        
-    Run_Bat({ Visible: "ConEmu", Colors: true, Pause: true }, StripBat( Script ) )
-    return
+if "!should_install!" equ "1" (
+    pushd "!ProjectDir!" || goto :exit
+    echo.
+    call e remove
+    call e
+    popd
+`)
+
+pushd "!ProjectDir!" || goto :exit
+call e
+set PYTHONPATH=!PYTHONPATH!;!ProjectDir!
+!StormCommand!
+popd
+)")
 }
 
-OnStormWsl:
-{
-    SplitPath, A_LineFile,, ProjectDir
-    SplitPath, ProjectDir,, ProjectDir
+OnStorm() => StormRun("python examples\run_storm_wiki_gpt.py --output-dir . --retriever bing --do-research --do-generate-outline --do-generate-article --do-polish-article")
 
-    WorkingDir := A_UserProfile
+OnStormUI() => StormRun("streamlit run frontend\demo_light\storm.py")
 
-    ProjectDirWsl := ConvertToWslPath(ProjectDir)
-    WorkingDirWsl := ConvertToWslPath(WorkingDir)
-    ShiftPressed := GetKeyState("Shift","P")
-    BatchScript =
-    (
-
-        echo !yellow!Running Storm in !green!%WorkingDir%!yellow! ...!nc!
-        md "%WorkingDir%"
-        dir /b /s "%WorkingDir%"
-    )
-    BashScript =
-    (
-        
-        # Check if Storm is installed in the user home directory
-        should_install=%ShiftPressed%
-        if [[ -f "/home/ubuntu/anaconda3/envs/storm/bin/python" && "$should_install" == "0" ]]; then
-            echo "Storm already installed."
-            cd "%ProjectDirWsl%" || { echo "Failed to change directory."; exit 1; }
-            source /home/ubuntu/anaconda3/etc/profile.d/conda.sh
-            conda activate storm || { echo "Failed to activate environment."; exit 1; }
-            PYTHONPATH=$PYTHONPATH;%ProjectDirWsl%
-            python examples/run_storm_wiki_gpt.py
-        else
-            source /home/ubuntu/anaconda3/etc/profile.d/conda.sh
-
-            echo "Creating new conda environment."
-            rm -rf /home/ubuntu/anaconda3/envs/storm
-            conda create -n storm python=3.11 -y || { echo "Failed to create environment."; exit 1; }
-
-            echo "Activating the environment."
-            conda activate storm || { echo "Failed to activate environment."; exit 1; }
-
-            cd "%ProjectDirWsl%" || { echo "Failed to change directory."; exit 1; }
-            pip install -r requirements.txt || { echo "Failed to install requirements."; exit 1; }
-
-            echo "Storm installed successfully."
-        fi
-    )
-    Options := { Visible: "ConEmu", Colors: true, Pause: true, Admin: false }
-    RunBash( Options, StripBat(BatchScript), StripBat(BashScript), [], true, true )
-    return
+OnOpenSecretsFile() {
+    try Run('"' Tools.VSCodePath '" "' ScriptRepo() '\secrets.toml"')   ; cli-ok: the editor shows its own window
 }
 
-OnOpenSecretsFile:
-{
-    SplitPath, A_LineFile,, ProjectDir
-    SplitPath, ProjectDir,, ProjectDir
-
-    FilePath := ProjectDir . "\secrets.toml"
-
-    Run, %VSCodePath% "%FilePath%"
-    return
-}
+Explorer2_Main(ProjectMenu)
